@@ -5,30 +5,32 @@ from estructura import Estructura
 from config import ANCHO, ALTO, FONDO_IMG, BLANCO, FUENTE, DIFICULTADES
 
 class Juego:
-    def __init__(self, dificultad):
+    def __init__(self, dificultad, nivel=1):
         self.dificultad = dificultad
+        self.nivel = nivel
         self.config = DIFICULTADES[dificultad]
         self.enemigos = pygame.sprite.Group()
         self.estructuras = pygame.sprite.Group()
         self.tiempo_spawn = 0
         self.puntuacion = 0
-        self.tiempo_total = 30
+        self.tiempo_total = 30 + (nivel - 1) * 10  # Incrementa el tiempo con el nivel
         self.tiempo_inicio = pygame.time.get_ticks()
         self.crear_estructuras()
 
     def crear_estructuras(self):
-        for i in range(3):
-            x = ANCHO // 4 * (i + 1)
+        num_estructuras = self.nivel  # Número de estructuras depende del nivel
+        for i in range(num_estructuras):
+            x = ANCHO // (num_estructuras + 1) * (i + 1)
             y = ALTO // 2
             estructura = Estructura(x, y, self.config["vida_estructura"], self.dificultad)
             self.estructuras.add(estructura)
 
     def generar_enemigos(self):
         ahora = pygame.time.get_ticks()
-        if ahora - self.tiempo_spawn > self.config["frecuencia"] * 1000:
+        if ahora - self.tiempo_spawn > self.config["frecuencia"] * 1000 / self.nivel:  # Más enemigos en niveles altos
             while True:
                 lado = random.choice(["izquierda", "derecha", "arriba", "abajo"])
-                enemigo_ancho, enemigo_alto = 40, 40 
+                enemigo_ancho, enemigo_alto = 40, 40
                 if lado == "izquierda":
                     x, y = -enemigo_ancho, random.randint(0, ALTO - enemigo_alto)
                 elif lado == "derecha":
@@ -42,7 +44,7 @@ class Juego:
                     break
 
             objetivo = random.choice(self.estructuras.sprites())
-            enemigo = Enemigo(x, y, self.config["velocidad"], self.config["vida_zerg"], objetivo, self.dificultad)
+            enemigo = Enemigo(x, y, self.config["velocidad"] + self.nivel * 0.5, self.config["vida_zerg"] + self.nivel * 5, objetivo, self.dificultad)
             self.enemigos.add(enemigo)
             self.tiempo_spawn = ahora
 
@@ -84,12 +86,43 @@ class Juego:
 
     def mostrar_fin_juego(self, pantalla):
         if len(self.estructuras) > 0:
-            mensaje = "¡Ganaste!"
+            mensaje = f"¡Ganaste el Nivel {self.nivel}!"
         else:
             mensaje = "¡Perdiste!"
-        texto_final = FUENTE.render(f"{mensaje} Puntuación: {self.puntuacion}", True, (255, 0, 0))
+        texto_final = FUENTE.render(mensaje, True, (255, 0, 0))
+        pantalla.blit(texto_final, (ANCHO // 2 - texto_final.get_width() // 2, ALTO // 2))
+        pygame.display.flip()
+        pygame.time.wait(3000)
+
+        if len(self.estructuras) > 0 and self.nivel < 3:
+            self.nivel += 1
+            self.reiniciar_nivel(pantalla)
+        else:
+            self.mostrar_victoria_o_derrota(pantalla)
+
+    def mostrar_victoria_o_derrota(self, pantalla):
+        if len(self.estructuras) > 0:
+            mensaje = "¡Ganaste el juego!"
+        else:
+            mensaje = "¡Perdiste!"  # Si pierdes en cualquier nivel
+
+        texto_final = FUENTE.render(mensaje, True, (0, 255, 0) if len(self.estructuras) > 0 else (255, 0, 0))
+        pantalla.fill((0, 0, 0))
         pantalla.blit(texto_final, (ANCHO // 2 - texto_final.get_width() // 2, ALTO // 2))
         pygame.display.flip()
         pygame.time.wait(5000)
         pygame.quit()
         exit()
+
+    def reiniciar_nivel(self, pantalla):
+        self.enemigos.empty()
+        self.estructuras.empty()
+        self.tiempo_spawn = 0
+        self.tiempo_inicio = pygame.time.get_ticks()
+        self.crear_estructuras()
+        self.puntuacion = 0
+        pantalla.fill((0, 0, 0))
+        mensaje = FUENTE.render(f"Nivel {self.nivel} comienza ahora!", True, (255, 255, 0))
+        pantalla.blit(mensaje, (ANCHO // 2 - mensaje.get_width() // 2, ALTO // 2))
+        pygame.display.flip()
+        pygame.time.wait(3000)
